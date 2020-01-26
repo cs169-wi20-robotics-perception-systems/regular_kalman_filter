@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+
+<launch>
+  <arg name="record" default="0" />
+  <arg name="robot_sensor" default="0" />       <!-- 0: use /cmd_vel data or 1: use /pose data -->
+  <arg name="scan_sensor" default="1" />        <!-- 0: use /scan data or 1: use /depthimage_to_laserscan data -->
+  <arg name="rgbd_compressed" default="1" />    <!-- 0: use image_raw or 1: republish compressed images -->
+
+  <!-- when using bag files, republish the rgbd compressed images -->
+  <group if="$(arg rgbd_compressed)">
+    <node pkg="image_transport" type="republish" name="republish" args="compressed in:=/camera/depth/image_raw raw out:=/camera/depth/image_raw" />
+  </group>
+
+  <!-- use rgbd images as laser scan data -->
+  <group if="$(arg scan_sensor)">
+    <node pkg="depthimage_to_laserscan" type="depthimage_to_laserscan" name="depthimage_to_laserscan" >
+      <param name="scan_height" value="3" />
+      <remap from="image" to="camera/depth/image_raw" />
+    </node>
+  </group>
+
+  <!-- implement a simple kalman filter -->
+  <node pkg="pa2" name="simple_kalman_filter_estimate" type="simple_kalman_filter_estimate.py" args="$(arg robot_sensor) $(arg scan_sensor)" output="screen" />
+
+  <!-- record ROS topics -->
+  <group if="$(arg record)">
+    <include file="$(find pa2)/launch/logger.launch" />
+  </group>
+
+</launch>
