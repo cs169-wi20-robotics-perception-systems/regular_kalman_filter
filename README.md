@@ -42,7 +42,7 @@ mkdir data
 ```
 
 ### Part 2
-To plot the data from the Kalman Filter algorithm:
+To plot the data from the Kalman filter algorithm:
 ```
 roslaunch pa2 plot_data.launch
 ```

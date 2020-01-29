@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 
 <launch>
-  <arg name="bag.name" default="$(find pa2)/data/$(optenv EXPERIMENT pa2)"/>
+  <arg name="bag.name" default="$(find regular_kalman_filter)/data/$(optenv EXPERIMENT regular_kalman_filter)"/>
   <arg name="bag.topics"
        default=
        "

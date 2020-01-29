@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>pa2</name>
+  <name>regular_kalman_filter</name>
   <version>2.2.3</version>
   <description>
     Assingment 2: "Kalman Filter" for COSC 169 Robotics Perception Systems
@@ -13,9 +13,12 @@
   <buildtool_depend>catkin</buildtool_depend>
 
   <build_depend>rospy</build_depend>
+  <build_depend>tf</build_depend>
 
   <build_export_depend>rospy</build_export_depend>
+  <build_export_depend>tf</build_export_depend>
 
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>tf</exec_depend>
 </package>

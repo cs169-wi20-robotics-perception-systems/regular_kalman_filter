@@ -22,11 +22,11 @@
   </group>
 
   <!-- implement a simple kalman filter -->
-  <node pkg="pa2" name="regular_kalman_filter_estimate" type="regular_kalman_filter_estimate.py" args="$(arg debug) $(arg target_distance) $(arg robot_sensor) $(arg scan_sensor)" output="screen" />
+  <node pkg="regular_kalman_filter" name="regular_kalman_filter_estimate" type="regular_kalman_filter_estimate.py" args="$(arg debug) $(arg target_distance) $(arg robot_sensor) $(arg scan_sensor)" output="screen" />
 
   <!-- record ROS topics -->
   <group if="$(arg record)">
-    <include file="$(find pa2)/launch/logger.launch" />
+    <include file="$(find regular_kalman_filter)/launch/logger.launch" />
   </group>
 
 </launch>

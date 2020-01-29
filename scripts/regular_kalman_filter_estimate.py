@@ -3,7 +3,7 @@
 import rospy
 import sys
 
-from pa2.rosbot import Rosbot
+from regular_kalman_filter.rosbot import Rosbot
 
 if __name__ == "__main__":
     debug_mode = int(sys.argv[1])
@@ -19,6 +19,6 @@ if __name__ == "__main__":
 
     rosbot = Rosbot(robot_sensor, scan_sensor, target_distance)
 
-    rospy.loginfo("Husarion ROSBot 2.0 regular Kalman filter initialized.")
+    rospy.logdebug("Husarion ROSBot 2.0 regular Kalman filter initialized.")
 
     rospy.spin()

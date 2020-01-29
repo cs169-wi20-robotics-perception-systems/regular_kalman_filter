@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 
 <launch>
-  <node pkg="pa2" name="plot_kalman_filter_estimate" type="plot_kalman_filter_estimate.py" output="screen" />
+  <node pkg="regular_kalman_filter" name="plot_kalman_filter_estimate" type="plot_kalman_filter_estimate.py" output="screen" />
 
 </launch>

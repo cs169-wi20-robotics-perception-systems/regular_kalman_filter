@@ -67,5 +67,5 @@ ax.bar(readings, errors)
 
 ax.set_title('Robot Moving Forward 1 m')
 ax.set_ylabel('Errors (m)')
-ax.set_yticks(np.arange(-0.05, 0.15, 0.01))
+ax.set_yticks(np.arange(-0.05, 0.05, 0.01))
 plt.show()
