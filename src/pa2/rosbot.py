@@ -7,37 +7,41 @@ from geometry_msgs.msg import Twist, PoseStamped, PoseWithCovarianceStamped
 from sensor_msgs.msg import LaserScan
 
 RATE = 10.0
-SCAN_ANGLE_MIN_INDEX = 15 # pi/12
-SCAN_ANGLE_MAX_INDEX = 345 # -pi/12
+SCAN_ANGLE_MIN_INDEX = 5 # pi/12
+SCAN_ANGLE_MAX_INDEX = 354 # -pi/12
 
 class Rosbot:
-    def __init__(self, robot_sensor, scan_sensor, distance_from_wall=2.0):
+    def __init__(self, robot_sensor, scan_sensor, target_distance=2.0):
         self.rate = rospy.Rate(RATE)  # 10 Hz
         self.scan_sensor = scan_sensor
-        self.target = distance_from_wall
+        self.target_distance = target_distance
 
-        self.scan_reading = 1.20
+        self.scan_reading = 0.0
+        self.prev_pose_reading = 0.33    # Only used when subscribing to pose topic
         self.state_estimate = 0.0
-        self.initial_state = PoseWithCovarianceStamped()
 
-        self.uncertainty_estimate = 1000.0
-        self.wheel_noise = 1.0
-        self.sensor_noise = 1.0
+        self.uncertainty_estimate = 2000.0
+        self.motion_noise = 50.0
+        self.sensor_noise = 200.0
 
         self.br = tf.TransformBroadcaster()
 
-        rospy.Subscriber("/initialpose", PoseWithCovarianceStamped, self.initial_pose_callback)
+        self.pose_kf_pub = rospy.Publisher("pose_kf", PoseWithCovarianceStamped, queue_size=1)
+
+        if 1 == robot_sensor:
+            rospy.Subscriber("initialpose", PoseWithCovarianceStamped, self.initial_pose_callback)
+            rospy.wait_for_message("initialpose", PoseWithCovarianceStamped)
+
+        rospy.Subscriber("scan", LaserScan, self.scan_callback)
+        rospy.wait_for_message("scan", LaserScan)
 
         # use /cmd_vel as robot's estimate
         if 0 == robot_sensor:
-            rospy.Subscriber("/cmd_vel", Twist, self.cmd_vel_callback)
+            rospy.Subscriber("cmd_vel", Twist, self.cmd_vel_callback)
         # use /pose as robot's estimate
         if 1 == robot_sensor:
-            rospy.Subscriber("/pose", PoseStamped, self.pose_callback)
+            rospy.Subscriber("pose", PoseStamped, self.pose_callback)
 
-        rospy.Subscriber("/scan", LaserScan, self.scan_callback)
-
-        self.pose_kf_pub = rospy.Publisher("/pose_kf", PoseWithCovarianceStamped, queue_size=1)
 
 
     def scan_callback(self, msg):
@@ -73,12 +77,14 @@ class Rosbot:
             # Use all data
             for index in range(len(msg.ranges)):
                 if msg.ranges[index] < msg.range_max:
-                    print(msg.ranges[index])
                     avg_scan_distance = avg_scan_distance + msg.ranges[index]
                     num_scan_points = num_scan_points + 1
 
         avg_scan_distance = avg_scan_distance / num_scan_points
         self.scan_reading = avg_scan_distance
+
+        if 1 == self.scan_sensor:
+            self.kalman_filter()
 
 
     def initial_pose_callback(self, msg):
@@ -88,7 +94,7 @@ class Rosbot:
         Args:
             msg: PoseWithCovarianceStamped msg that has the current pose, orientation, and covariance matrix.
         """
-        self.initial_state = msg
+        self.prev_pose_reading = msg.pose.pose.position.x
 
 
     def cmd_vel_callback(self, msg):
@@ -100,7 +106,12 @@ class Rosbot:
         """
         change_in_state = (1 / RATE) * msg.linear.x
 
-        self.kalman_filter(change_in_state)
+        self.rate.sleep()
+
+        self.state_estimate = self.state_estimate + change_in_state
+
+        if 0 == self.scan_sensor:
+            self.kalman_filter()
 
 
     def pose_callback(self, msg):
@@ -110,40 +121,34 @@ class Rosbot:
         Args:
             msg: PoseStamped msg that has the current robot's position and orientation.
         """
-        change_in_state = msg.pose.position.x
+        change_in_state = msg.pose.position.x - self.prev_pose_reading
+        self.prev_pose_reading = msg.pose.position.x
+        self.state_estimate = self.state_estimate + change_in_state
 
-        self.kalman_filter(change_in_state)
+        if 0 == self.scan_sensor:
+            self.kalman_filter()
 
 
-    def kalman_filter(self, change_in_state):
+    def kalman_filter(self):
         """
         Function that implements a simple Kalman Filter. Then publishes the results as a ROS topic and as a transformation.
 
         Args:
             change_in_state: The change in state (distance) the robot estimates it has made.
         """
-        # Updates the robot's estimated uncertainty using either wheel velocity or odometry data.
-        self.state_estimate, self.uncertainty_estimate = kalman_filter_lib.propagation(self.state_estimate, change_in_state,
-            self.uncertainty_estimate, self.wheel_noise)
+        # Updates the robot's estimated uncertainty using either linear velocity or odometry data.
+        self.uncertainty_estimate = kalman_filter_lib.propagation(self.uncertainty_estimate, self.motion_noise)
 
         # Updates the robot's estimated state and uncertainty using sensor data and a simple Kalman Filter.
-        self.state_estimate, self.uncertainty_estimate, covariance = kalman_filter_lib.update(self.state_estimate, self.target, self.scan_reading,
-            self.uncertainty_estimate, self.sensor_noise)
-
-        # TO DO: remove when scan readings are accurate again
-        self.scan_reading = self.scan_reading - 0.015
+        self.state_estimate, self.uncertainty_estimate = kalman_filter_lib.update(self.state_estimate, self.target_distance,
+            self.scan_reading, self.uncertainty_estimate, self.sensor_noise)
 
         # Publish the estimated pose calculated using a simple Kalman Filter.
         pose_kf_msg = PoseWithCovarianceStamped()
         pose_kf_msg.header.stamp = rospy.Time.now()
         pose_kf_msg.header.frame_id = "base_link"
         pose_kf_msg.pose.pose.position.x = self.state_estimate
-        pose_kf_msg.pose.covariance = [covariance, 0, 0, 0, 0, 0,
-                                        0, 1, 0, 0, 0, 0,
-                                        0, 0, 1, 0, 0, 0,
-                                        0, 0, 0, 1, 0, 0,
-                                        0, 0, 0, 0, 1, 0,
-                                        0, 0, 0, 0, 0, 1]
+        pose_kf_msg.pose.covariance[0] = self.uncertainty_estimate
         self.pose_kf_pub.publish(pose_kf_msg)
 
         # Publish a transformation based on the estimated pose calculated using a simple Kalman Filter.
